@@ -1,4 +1,4 @@
 gopinba
 =======
 
-Pinba Go client
+Pinba (http://pinba.org) Go client
