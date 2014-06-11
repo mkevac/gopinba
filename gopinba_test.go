@@ -71,21 +71,18 @@ func TestPinbaRequest(t *testing.T) {
 		req.RequestCount = 1
 		req.RequestTime = time.Second
 		req.DocumentSize = 1024
-		req.timers = make([]PinbaTimer, 0)
 
-		timer1 := PinbaTimer{}
-		timer1.Name = "markotimer1"
-		timer1.Duration = 0.1
-		timer1.Tags = map[string]string{"home": "lala", "papa": "mama"}
+		req.AddTimer(PinbaTimer{
+			Name:     "markotimer1",
+			Duration: 0.1,
+			Tags:     map[string]string{"home": "lala", "papa": "mama"},
+		})
 
-		req.timers = append(req.timers, timer1)
-
-		timer2 := PinbaTimer{}
-		timer2.Name = "markotimer2"
-		timer2.Duration = 0.1
-		timer2.Tags = map[string]string{"home": "roro", "hoho": "fofo"}
-
-		req.timers = append(req.timers, timer2)
+		req.AddTimer(PinbaTimer{
+			Name:     "markotimer2",
+			Duration: 0.1,
+			Tags:     map[string]string{"home": "lala1", "papa2": "mama2"},
+		})
 
 		err = pc.SendRequest(&req)
 		if err != nil {
