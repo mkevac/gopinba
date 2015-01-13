@@ -56,7 +56,7 @@ func TestUseAndUpdateDictionary(t *testing.T) {
 }
 
 func TestPinbaRequest(t *testing.T) {
-	pc, err := NewPinbaClient("127.0.0.1:30002")
+	pc, err := NewPinbaClient("10.0.0.1:30002")
 	if err != nil {
 		t.Errorf("NewPinbaClient() returned error: %v", err)
 	}
