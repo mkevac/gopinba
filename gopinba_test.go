@@ -72,18 +72,6 @@ func TestRequest(t *testing.T) {
 		req.RequestTime = 145987 * time.Microsecond
 		req.DocumentSize = 1024
 
-		req.AddTimer(Timer{
-			Name:     "markotimer1",
-			Duration: 100 * time.Millisecond,
-			Tags:     map[string]string{"home": "lala", "papa": "mama"},
-		})
-
-		req.AddTimer(Timer{
-			Name:     "markotimer2",
-			Duration: 100 * time.Millisecond,
-			Tags:     map[string]string{"home": "lala1", "papa2": "mama2"},
-		})
-
 		err = pc.SendRequest(&req)
 		if err != nil {
 			t.Errorf("SendRequest() returned error: %v", err)
