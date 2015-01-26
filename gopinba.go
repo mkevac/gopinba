@@ -1,26 +1,31 @@
 package gopinba
 
 import (
-	"code.google.com/p/goprotobuf/proto"
 	"fmt"
-	"github.com/mkevac/gopinba/Pinba"
 	"net"
+	"sync"
 	"time"
+
+	"github.com/gogo/protobuf/proto"
+	"github.com/mkevac/gopinba/Pinba"
 )
 
-type PinbaClient struct {
+type Client struct {
 	initialized bool
 	address     string
 	conn        net.Conn
 }
 
-type PinbaTimer struct {
-	Name     string
-	Duration float32
-	Tags     map[string]string
+type Timer struct {
+	Tags map[string]string
+
+	// private stuff for simpler api
+	stopped  bool
+	started  time.Time
+	duration time.Duration
 }
 
-type PinbaRequest struct {
+type Request struct {
 	Hostname     string
 	ServerName   string
 	ScriptName   string
@@ -30,11 +35,13 @@ type PinbaRequest struct {
 	MemoryPeak   uint32
 	Utime        float32
 	Stime        float32
-	timers       []PinbaTimer
+	timers       []Timer
+	Status       uint32
+	lk           sync.Mutex
 }
 
-func NewPinbaClient(address string) (*PinbaClient, error) {
-	pc := &PinbaClient{address: address}
+func NewClient(address string) (*Client, error) {
+	pc := &Client{address: address}
 	conn, err := net.Dial("udp", address)
 	if err != nil {
 		return nil, err
@@ -88,29 +95,31 @@ func useAndUpdateDictionary(dictionary []string, tags map[string]string) (map[ui
 	return newTags, newDict
 }
 
-func (pc *PinbaClient) SendRequest(request *PinbaRequest) error {
+func (pc *Client) SendRequest(request *Request) error {
 
 	if !pc.initialized {
-		return fmt.Errorf("PinbaClient not initialized")
+		return fmt.Errorf("Client not initialized")
 	}
 
-	pbreq := Pinba.Request{}
-	pbreq.Hostname = proto.String(request.Hostname)
-	pbreq.ServerName = proto.String(request.ServerName)
-	pbreq.ScriptName = proto.String(request.ScriptName)
-	pbreq.RequestCount = proto.Uint32(request.RequestCount)
-	pbreq.RequestTime = proto.Float32(float32(request.RequestTime.Seconds()))
-	pbreq.DocumentSize = proto.Uint32(request.DocumentSize)
-	pbreq.MemoryPeak = proto.Uint32(request.MemoryPeak)
-	pbreq.RuUtime = proto.Float32(request.Utime)
-	pbreq.RuStime = proto.Float32(request.Stime)
-	pbreq.TimerHitCount = make([]uint32, 0)
-	pbreq.TimerValue = make([]float32, 0)
-	pbreq.Dictionary = make([]string, 0)
+	pbreq := Pinba.Request{
+		Hostname:      request.Hostname,
+		ServerName:    request.ServerName,
+		ScriptName:    request.ScriptName,
+		RequestCount:  request.RequestCount,
+		RequestTime:   float32(request.RequestTime.Seconds()),
+		DocumentSize:  request.DocumentSize,
+		MemoryPeak:    request.MemoryPeak,
+		RuUtime:       request.Utime,
+		RuStime:       request.Stime,
+		Status:        request.Status,
+		TimerHitCount: make([]uint32, 0),
+		TimerValue:    make([]float32, 0),
+		Dictionary:    make([]string, 0),
+	}
 
 	for _, timer := range request.timers {
 		pbreq.TimerHitCount = append(pbreq.TimerHitCount, 1)
-		pbreq.TimerValue = append(pbreq.TimerValue, timer.Duration)
+		pbreq.TimerValue = append(pbreq.TimerValue, float32(timer.duration.Seconds()))
 		tagsMap, newDict := useAndUpdateDictionary(pbreq.Dictionary, timer.Tags)
 		pbreq.Dictionary = newDict
 		pbreq.TimerTagCount = append(pbreq.TimerTagCount, uint32(len(tagsMap)))
@@ -134,6 +143,45 @@ func (pc *PinbaClient) SendRequest(request *PinbaRequest) error {
 	return nil
 }
 
-func (req *PinbaRequest) AddTimer(timer PinbaTimer) {
-	req.timers = append(req.timers, timer)
+func (req *Request) AddTimer(timer *Timer) {
+	req.lk.Lock()
+	defer req.lk.Unlock()
+
+	req.timers = append(req.timers, *timer)
+}
+
+// this is exactly the same as AddTimer
+//  exists only to have api naming similar to pinba php extension
+func (req *Request) TimerAdd(timer *Timer) {
+	timer.Stop()
+	req.AddTimer(timer)
+}
+
+func TimerStart(tags map[string]string) *Timer {
+	return &Timer{
+		duration: 0,
+		Tags:     tags,
+		stopped:  false,
+		started:  time.Now(),
+	}
+}
+
+func NewTimer(tags map[string]string, duration time.Duration) *Timer {
+	return &Timer{
+		duration: duration,
+		Tags:     tags,
+		stopped:  true,
+		started:  time.Now().Add(-duration),
+	}
+}
+
+func (t *Timer) Stop() {
+	if !t.stopped {
+		t.stopped = true
+		t.duration = time.Now().Sub(t.started)
+	}
+}
+
+func (t *Timer) GetDuration() time.Duration {
+	return t.duration
 }

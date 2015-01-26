@@ -55,13 +55,13 @@ func TestUseAndUpdateDictionary(t *testing.T) {
 	allInStringSlice(dict, []string{"marko", "margo", "lazo", "kevac", "liza", "pontiy", "kursor"}, t)
 }
 
-func TestPinbaRequest(t *testing.T) {
-	pc, err := NewPinbaClient("10.0.0.1:30002")
+func TestRequest(t *testing.T) {
+	pc, err := NewClient("10.0.0.1:30002")
 	if err != nil {
-		t.Errorf("NewPinbaClient() returned error: %v", err)
+		t.Errorf("NewClient() returned error: %v", err)
 	}
 
-	req := PinbaRequest{}
+	req := Request{}
 
 	for i := 0; i < 5; i++ {
 
@@ -69,18 +69,18 @@ func TestPinbaRequest(t *testing.T) {
 		req.ServerName = "servername"
 		req.ScriptName = "scriptname"
 		req.RequestCount = 1
-		req.RequestTime = time.Second
+		req.RequestTime = 145987 * time.Microsecond
 		req.DocumentSize = 1024
 
-		req.AddTimer(PinbaTimer{
+		req.AddTimer(Timer{
 			Name:     "markotimer1",
-			Duration: 0.1,
+			Duration: 100 * time.Millisecond,
 			Tags:     map[string]string{"home": "lala", "papa": "mama"},
 		})
 
-		req.AddTimer(PinbaTimer{
+		req.AddTimer(Timer{
 			Name:     "markotimer2",
-			Duration: 0.1,
+			Duration: 100 * time.Millisecond,
 			Tags:     map[string]string{"home": "lala1", "papa2": "mama2"},
 		})
 
