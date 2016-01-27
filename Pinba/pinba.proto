@@ -26,16 +26,16 @@ message Request {
 	required float ru_utime          =  8 [(gogoproto.nullable) = false];
 	required float ru_stime          =  9 [(gogoproto.nullable) = false];
 
-	repeated uint32 timer_hit_count  = 10 [(gogoproto.nullable) = false];
-	repeated float timer_value       = 11 [(gogoproto.nullable) = false];
-	repeated uint32 timer_tag_count  = 12 [(gogoproto.nullable) = false];
-	repeated uint32 timer_tag_name   = 13 [(gogoproto.nullable) = false];
-	repeated uint32 timer_tag_value  = 14 [(gogoproto.nullable) = false];
-	repeated string dictionary       = 15 [(gogoproto.nullable) = false];
+	repeated uint32 timer_hit_count  = 10;
+	repeated float timer_value       = 11;
+	repeated uint32 timer_tag_count  = 12;
+	repeated uint32 timer_tag_name   = 13;
+	repeated uint32 timer_tag_value  = 14;
+	repeated string dictionary       = 15;
 	optional uint32 status           = 16 [(gogoproto.nullable) = false];
 	optional uint32 memory_footprint = 17 [(gogoproto.nullable) = false]; // allow nullable maybe?
 	repeated Request requests        = 18 [(gogoproto.nullable) = false]; // allow nullable maybe?
 	optional string schema           = 19 [(gogoproto.nullable) = false]; // allow nullable maybe?
-	repeated uint32 tag_name         = 20 [(gogoproto.nullable) = false];
-	repeated uint32 tag_value        = 21 [(gogoproto.nullable) = false];
+	repeated uint32 tag_name         = 20;
+	repeated uint32 tag_value        = 21;
 }
