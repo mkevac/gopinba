@@ -120,14 +120,11 @@ func (pc *Client) SendRequest(request *Request) error {
 		Dictionary:    make([]string, 0),
 	}
 	
-	for _, tag := range request.Tags {
-		tagsMap, newDict := useAndUpdateDictionary(pbreq.Dictionary, timer.Tags)
-		pbreq.Dictionary = newDict
-		
-		for k, v := range tagsMap {
-			pbreq.TagName = append(pbreq.TagName, k)
-			pbreq.TagValue = append(pbreq.TagValue, v)
-		}
+	tagsMap, newDict := useAndUpdateDictionary(pbreq.Dictionary, request.Tags)
+	pbreq.Dictionary = newDict
+	for k, v := range tagsMap {
+		pbreq.TagName = append(pbreq.TagName, k)
+		pbreq.TagValue = append(pbreq.TagValue, v)
 	}
 
 	for _, timer := range request.timers {
