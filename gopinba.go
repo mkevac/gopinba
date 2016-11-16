@@ -37,6 +37,7 @@ type Request struct {
 	Stime        float32
 	timers       []Timer
 	Status       uint32
+	Tags         map[string]string
 	lk           sync.Mutex
 }
 
@@ -114,7 +115,19 @@ func (pc *Client) SendRequest(request *Request) error {
 		Status:        request.Status,
 		TimerHitCount: make([]uint32, 0),
 		TimerValue:    make([]float32, 0),
+		TagName:       make([]uint32, 0),
+		TagValue:      make([]uint32, 0),
 		Dictionary:    make([]string, 0),
+	}
+	
+	for _, tag := range request.Tags {
+		tagsMap, newDict := useAndUpdateDictionary(pbreq.Dictionary, timer.Tags)
+		pbreq.Dictionary = newDict
+		
+		for k, v := range tagsMap {
+			pbreq.TagName = append(pbreq.TagName, k)
+			pbreq.TagValue = append(pbreq.TagValue, v)
+		}
 	}
 
 	for _, timer := range request.timers {
