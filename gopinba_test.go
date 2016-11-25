@@ -1,6 +1,10 @@
 package gopinba
 
 import (
+	"context"
+	"fmt"
+	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -75,6 +79,65 @@ func TestRequest(t *testing.T) {
 		err = pc.SendRequest(&req)
 		if err != nil {
 			t.Errorf("SendRequest() returned error: %v", err)
+		}
+	}
+}
+
+func BenchmarkSimple(b *testing.B) {
+	// We listen on a random port
+	udpAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
+	if err != nil {
+		b.Fatalf("net.ResolveUDPAddr() failed: %v", err)
+	}
+
+	udpListener, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		b.Fatalf("net.ListenUDP() failed: %v", err)
+	}
+	defer udpListener.Close()
+
+	// We need to find out which port we are listening to
+	udpPort := func() string {
+		splitted := strings.Split(udpListener.LocalAddr().String(), ":")
+		return splitted[len(splitted)-1]
+	}()
+
+	pc, err := NewClient(fmt.Sprintf(":%s", udpPort))
+	if err != nil {
+		b.Fatalf("NewClient() returned error: %v", err)
+	}
+
+	var (
+		udpBuf = make([]byte, 4096)
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				_, _, _ = udpListener.ReadFromUDP(udpBuf)
+			}
+		}
+	}()
+
+	for i := 0; i < b.N; i++ {
+		req := Request{}
+
+		req.Hostname = "hostname"
+		req.ServerName = "servername"
+		req.ScriptName = "scriptname"
+		req.RequestCount = 1
+		req.RequestTime = 145987 * time.Microsecond
+		req.DocumentSize = 1024
+
+		err = pc.SendRequest(&req)
+		if err != nil {
+			b.Errorf("SendRequest() returned error: %v", err)
 		}
 	}
 }
