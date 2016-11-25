@@ -1,4 +1,4 @@
-gopinba
+gopinba [![Build Status](https://travis-ci.org/mkevac/gopinba.svg?branch=master)](https://travis-ci.org/mkevac/gopinba)
 =======
 
 Pinba (http://pinba.org) Go client.
