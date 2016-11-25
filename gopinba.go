@@ -8,7 +8,6 @@ import (
 
 	"github.com/mkevac/monotime"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/mkevac/gopinba/Pinba"
 )
 
@@ -65,37 +64,73 @@ func iN(haystack []string, needle string) (int, bool) {
 	return -1, false
 }
 
-func useAndUpdateDictionary(dictionary []string, tags map[string]string) (map[uint32]uint32, []string) {
-	newTags := make(map[uint32]uint32)
-	newDict := dictionary
+func mergeTags(req *Pinba.Request, tags map[string]string) {
+	for k, v := range tags {
+		{
+			pos, exists := iN(req.Dictionary, k)
+			if !exists {
+				req.Dictionary = append(req.Dictionary, k)
+				pos = len(req.Dictionary) - 1
+			}
+
+			req.TagName = append(req.TagName, uint32(pos))
+		}
+
+		{
+			pos, exists := iN(req.Dictionary, v)
+			if !exists {
+				req.Dictionary = append(req.Dictionary, v)
+				pos = len(req.Dictionary) - 1
+			}
+
+			req.TagValue = append(req.TagValue, uint32(pos))
+		}
+	}
+}
+
+func mergeTimerTags(req *Pinba.Request, tags map[string]string) {
+	req.TimerTagCount = append(req.TimerTagCount, uint32(len(tags)))
 
 	for k, v := range tags {
+		{
+			pos, exists := iN(req.Dictionary, k)
+			if !exists {
+				req.Dictionary = append(req.Dictionary, k)
+				pos = len(req.Dictionary) - 1
+			}
 
-		var kpos int
-		var vpos int
-		var pos int
-		var exist bool
-
-		pos, exist = iN(newDict, k)
-		if exist {
-			kpos = pos
-		} else {
-			newDict = append(newDict, k)
-			kpos = len(newDict) - 1
+			req.TimerTagName = append(req.TimerTagName, uint32(pos))
 		}
 
-		pos, exist = iN(newDict, v)
-		if exist {
-			vpos = pos
-		} else {
-			newDict = append(newDict, v)
-			vpos = len(newDict) - 1
-		}
+		{
+			pos, exists := iN(req.Dictionary, v)
+			if !exists {
+				req.Dictionary = append(req.Dictionary, v)
+				pos = len(req.Dictionary) - 1
+			}
 
-		newTags[uint32(kpos)] = uint32(vpos)
+			req.TimerTagValue = append(req.TimerTagValue, uint32(pos))
+		}
+	}
+}
+
+func preallocateArrays(req *Pinba.Request, timers []Timer) {
+
+	// calculate (max) final lengths for all arrays
+	nTimers := 0
+	nTags := 0
+	for _, timer := range timers {
+		nTimers++
+		nTags += len(timer.Tags)
 	}
 
-	return newTags, newDict
+	// construct arrays capable of holding all possible values to reduce allocations
+	req.TimerHitCount = make([]uint32, 0, nTimers) // number of hits for each timer
+	req.TimerValue = make([]float32, 0, nTimers)   // timer value for each timer
+	req.Dictionary = make([]string, 0, nTags)      // all strings used in timer tag names/values
+	req.TimerTagCount = make([]uint32, 0, nTimers) // number of tags for each timer
+	req.TimerTagName = make([]uint32, 0, nTags)    // flat array of all tag names (as offsets into dictionary) laid out sequentially for all timers
+	req.TimerTagValue = make([]uint32, 0, nTags)   // flat array of all tag values (as offsets into dictionary) laid out sequentially for all timers
 }
 
 func (pc *Client) SendRequest(request *Request) error {
@@ -105,49 +140,39 @@ func (pc *Client) SendRequest(request *Request) error {
 	}
 
 	pbreq := Pinba.Request{
-		Hostname:      request.Hostname,
-		ServerName:    request.ServerName,
-		ScriptName:    request.ScriptName,
-		RequestCount:  request.RequestCount,
-		RequestTime:   float32(request.RequestTime.Seconds()),
-		DocumentSize:  request.DocumentSize,
-		MemoryPeak:    request.MemoryPeak,
-		RuUtime:       request.Utime,
-		RuStime:       request.Stime,
-		Status:        request.Status,
-		TimerHitCount: make([]uint32, 0),
-		TimerValue:    make([]float32, 0),
-		TagName:       make([]uint32, 0),
-		TagValue:      make([]uint32, 0),
-		Dictionary:    make([]string, 0),
+		Hostname:     request.Hostname,
+		ServerName:   request.ServerName,
+		ScriptName:   request.ScriptName,
+		RequestCount: request.RequestCount,
+		RequestTime:  float32(request.RequestTime.Seconds()),
+		DocumentSize: request.DocumentSize,
+		MemoryPeak:   request.MemoryPeak,
+		RuUtime:      request.Utime,
+		RuStime:      request.Stime,
+		Status:       request.Status,
 	}
-	
-	tagsMap, newDict := useAndUpdateDictionary(pbreq.Dictionary, request.Tags)
-	pbreq.Dictionary = newDict
-	for k, v := range tagsMap {
-		pbreq.TagName = append(pbreq.TagName, k)
-		pbreq.TagValue = append(pbreq.TagValue, v)
-	}
+
+	preallocateArrays(&pbreq, request.timers)
+
+	pbreq.TagValue = make([]uint32, 0, len(request.Tags))
+	pbreq.TagName = make([]uint32, 0, len(request.Tags))
+
+	mergeTags(&pbreq, request.Tags)
 
 	for _, timer := range request.timers {
 		pbreq.TimerHitCount = append(pbreq.TimerHitCount, 1)
 		pbreq.TimerValue = append(pbreq.TimerValue, float32(timer.duration.Seconds()))
-		tagsMap, newDict := useAndUpdateDictionary(pbreq.Dictionary, timer.Tags)
-		pbreq.Dictionary = newDict
-		pbreq.TimerTagCount = append(pbreq.TimerTagCount, uint32(len(tagsMap)))
-
-		for k, v := range tagsMap {
-			pbreq.TimerTagName = append(pbreq.TimerTagName, k)
-			pbreq.TimerTagValue = append(pbreq.TimerTagValue, v)
-		}
+		mergeTimerTags(&pbreq, timer.Tags)
 	}
 
-	buf, err := proto.Marshal(&pbreq)
+	buf := make([]byte, pbreq.Size())
+
+	n, err := pbreq.MarshalTo(buf)
 	if err != nil {
 		return err
 	}
 
-	_, err = pc.conn.Write(buf)
+	_, err = pc.conn.Write(buf[:n])
 	if err != nil {
 		return err
 	}
