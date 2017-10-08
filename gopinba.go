@@ -30,6 +30,7 @@ type Request struct {
 	Hostname     string
 	ServerName   string
 	ScriptName   string
+	Schema       string
 	RequestCount uint32
 	RequestTime  time.Duration
 	DocumentSize uint32
@@ -150,6 +151,7 @@ func (pc *Client) SendRequest(request *Request) error {
 		RuUtime:      request.Utime,
 		RuStime:      request.Stime,
 		Status:       request.Status,
+		Schema:       request.Schema,
 	}
 
 	preallocateArrays(&pbreq, request.timers)
