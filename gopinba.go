@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mkevac/monotime"
-
 	"github.com/mkevac/gopinba/Pinba"
 )
 
@@ -201,7 +199,7 @@ func TimerStart(tags map[string]string) *Timer {
 		duration: 0,
 		Tags:     tags,
 		stopped:  false,
-		started:  monotime.Now(),
+		started:  now(),
 	}
 }
 
@@ -210,14 +208,14 @@ func NewTimer(tags map[string]string, duration time.Duration) *Timer {
 		duration: duration,
 		Tags:     tags,
 		stopped:  true,
-		started:  monotime.Now().Add(-duration),
+		started:  now().Add(-duration),
 	}
 }
 
 func (t *Timer) Stop() {
 	if !t.stopped {
 		t.stopped = true
-		t.duration = monotime.Now().Sub(t.started)
+		t.duration = now().Sub(t.started)
 	}
 }
 
